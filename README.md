@@ -1,5 +1,7 @@
 # Desktop Habitats
 
+**English** · [简体中文](README.zh-CN.md)
+
 [![Desktop Habitats aquarium demo](docs/images/demo.gif)](docs/videos/demo.mp4)
 
 Have you always wanted an aquarium? Now you can have it, right on your desktop :)
@@ -53,11 +55,12 @@ It uses more power than a still wallpaper because it renders a 3D scene. The amo
 
 Both scenes use the same quality profiles and stop rendering when paused or hidden. The wallpaper also responds to window coverage, battery power, Low Power Mode and screen sleep.
 
-With the default Balanced profile, both environments use these limits:
+The wallpaper runs the Detail profile. Its limits by desktop state are:
 
 | Desktop state | Frame rate |
 | --- | --- |
-| Clearly visible, plugged in or on battery | Up to 30 fps |
+| Clearly visible, plugged in | Up to 60 fps |
+| Clearly visible, on battery | Up to 30 fps |
 | Mostly covered by windows | Up to 20 fps |
 | Almost entirely covered | Stopped |
 | Low Power Mode, locked screen or sleeping display | Stopped |

@@ -17,7 +17,10 @@ const canvas=document.querySelector('#scene'),habitat=document.querySelector('#h
 const params=new URLSearchParams(location.search),isHost=document.documentElement.dataset.motion==='host';
 const capture=params.has('capture');
 if(capture)document.body.classList.add('clean','capture');
-let quality=preferredQuality(params);
+const asked=params.get('quality');
+// Same rule as the riverscape: the wallpaper renders at the detail preset rather than the
+// balanced one, and the host's rate ladder still caps what it actually asks for.
+let quality=asked?qualityName(asked):isHost?'detail':preferredQuality(params);
 let hostRate=isHost?0:60,onBattery=false,contextLost=false,disposed=false;
 let paused=capture||(!isHost&&matchMedia('(prefers-reduced-motion: reduce)').matches);
 let changeRate=()=>{},changePower=()=>{},feed=()=>{};
