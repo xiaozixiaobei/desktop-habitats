@@ -32,6 +32,8 @@ rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/scene/scenes"
 cp "$build/Desktop Habitats" "$app/Contents/MacOS/Desktop Habitats"
 cp "$here/Info.plist" "$app/Contents/Info.plist"
+cp "$here/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"
+cp -R "$here/en.lproj" "$here/zh-Hans.lproj" "$app/Contents/Resources/"
 # No trailing slash on the source: with one, cp copies the directory's contents.
 for scene in "$project"/scenes/*; do
 	cp -R "$scene" "$app/Contents/Resources/scene/scenes/"

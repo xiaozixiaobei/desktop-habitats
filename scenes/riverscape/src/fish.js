@@ -6,10 +6,22 @@ import {
   createFishMaterials,
   makeAnatomy,
   SNOUT_X,
+  SPECIES,
+  speciesOrder,
   STANDARD_LENGTH,
 } from "./fish-anatomy.js";
 
-export const COUNT = 24;
+// Every animal in the tank. The behaviour below treats them as one school of mixed
+// species, which is what a community tank of tetras actually does.
+export const COUNT = SPECIES.reduce((total, species) => total + species.count, 0);
+
+// Which species each fish id belongs to, and where it sits inside that species' draw
+// call. The species are dealt out in turn so no one of them ends up clumped in a corner.
+const SPECIES_OF = speciesOrder(SPECIES);
+const SLOT_OF = (() => {
+  const next = SPECIES.map(() => 0);
+  return SPECIES_OF.map((species) => next[species]++);
+})();
 // The whole water column the fish may use. The floor is the sand, tracked separately.
 export const BOUNDS = {
   minX: -8.3,
@@ -336,7 +348,7 @@ const SWIM_GLSL = /* glsl */ `
   }
 `;
 
-function applySwimming(material, withColor = true) {
+function applySwimming(material, withColor = true, species = null) {
   material.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader.replace(
       "#include <common>",
@@ -360,7 +372,7 @@ function applySwimming(material, withColor = true) {
           vFishPart = aPart;
         `,
         );
-      applySkin(shader);
+      applySkin(shader, species.livery);
     } else {
       shader.vertexShader = shader.vertexShader.replace(
         "#include <begin_vertex>",
@@ -371,8 +383,11 @@ function applySwimming(material, withColor = true) {
       );
     }
   };
+  // The livery is compiled into the fragment stage, so each species is its own program.
+  // A key that does not name the species would let Three compile one and hand it to all
+  // of them, which paints every fish like whichever was drawn first.
   material.customProgramCacheKey = () =>
-    `riverscape-fish-${withColor ? "skin" : "depth"}-4`;
+    `riverscape-fish-${withColor ? species.key : "depth"}`;
 }
 
 function clampToBox(position, box, margin = 0) {
@@ -413,39 +428,45 @@ export function createFishSchool(
   const random = randomGenerator(583137);
   const range = (min, max) => min + random() * (max - min);
   const exponential = (mean) => -mean * Math.log(1 - random());
-  const geometry = makeAnatomy();
-  const swimAttribute = new THREE.InstancedBufferAttribute(
-    new Float32Array(COUNT * 4),
-    4,
-  );
-  const finPhaseAttribute = new THREE.InstancedBufferAttribute(
-    new Float32Array(COUNT), 1,
-  );
-  swimAttribute.setUsage(THREE.DynamicDrawUsage);
-  finPhaseAttribute.setUsage(THREE.DynamicDrawUsage);
-  geometry.body.setAttribute("aSwim", swimAttribute);
-  geometry.fins.setAttribute("aSwim", swimAttribute);
-  geometry.body.setAttribute("aFinPhase", finPhaseAttribute);
-  geometry.fins.setAttribute("aFinPhase", finPhaseAttribute);
-  const { skin: skinMaterial, fins: finMaterial } = createFishMaterials();
-  const depthMaterial = new THREE.MeshDepthMaterial({
-    depthPacking: THREE.RGBADepthPacking,
+  // A draw call per species rather than per animal. The paint job is compiled into the
+  // fragment stage, so each species carries its own geometry, materials and meshes; the
+  // anatomy underneath is the same animal four times over.
+  const flocks = SPECIES.map((species) => {
+    const geometry = makeAnatomy();
+    const swim = new THREE.InstancedBufferAttribute(
+      new Float32Array(species.count * 4),
+      4,
+    );
+    const finPhase = new THREE.InstancedBufferAttribute(
+      new Float32Array(species.count), 1,
+    );
+    swim.setUsage(THREE.DynamicDrawUsage);
+    finPhase.setUsage(THREE.DynamicDrawUsage);
+    geometry.body.setAttribute("aSwim", swim);
+    geometry.fins.setAttribute("aSwim", swim);
+    geometry.body.setAttribute("aFinPhase", finPhase);
+    geometry.fins.setAttribute("aFinPhase", finPhase);
+    const { skin, fins } = createFishMaterials();
+    const depth = new THREE.MeshDepthMaterial({
+      depthPacking: THREE.RGBADepthPacking,
+    });
+    applySwimming(skin, true, species);
+    applySwimming(fins, true, species);
+    applySwimming(depth, false);
+    const bodies = new THREE.InstancedMesh(geometry.body, skin, species.count);
+    const membranes = new THREE.InstancedMesh(geometry.fins, fins, species.count);
+    bodies.name = `${species.name} bodies`;
+    membranes.name = `${species.name} attached fins`;
+    bodies.castShadow = true;
+    bodies.receiveShadow = true;
+    bodies.customDepthMaterial = depth;
+    bodies.frustumCulled = false;
+    membranes.frustumCulled = false;
+    bodies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    membranes.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(bodies, membranes);
+    return { geometry, swim, finPhase, skin, fins, depth, bodies, membranes };
   });
-  applySwimming(skinMaterial);
-  applySwimming(finMaterial);
-  applySwimming(depthMaterial, false);
-  const bodies = new THREE.InstancedMesh(geometry.body, skinMaterial, COUNT);
-  const membranes = new THREE.InstancedMesh(geometry.fins, finMaterial, COUNT);
-  bodies.name = "Silver-blue freshwater fish";
-  membranes.name = "Attached translucent fish fins";
-  bodies.castShadow = true;
-  bodies.receiveShadow = true;
-  bodies.customDepthMaterial = depthMaterial;
-  bodies.frustumCulled = false;
-  membranes.frustumCulled = false;
-  bodies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  membranes.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  scene.add(bodies, membranes);
 
   // Places a fish may go and look at: the hardscape landmarks and spots inside the grass.
   const interests = landmarks.map((landmark) => ({ ...landmark }));
@@ -489,6 +510,10 @@ export function createFishSchool(
     ).normalize();
     return {
       id,
+      // Which species this animal is, and where its instance sits inside that species'
+      // draw call. Behaviour is shared across all of them; only the drawing is per species.
+      species: SPECIES_OF[id],
+      slot: SLOT_OF[id],
       position,
       heading,
       swim: heading.clone().multiplyScalar(range(0.02, 0.08)),
@@ -1630,14 +1655,15 @@ export function createFishSchool(
       f.finBrake = THREE.MathUtils.lerp(f.finBrake, pectorals, 1 - Math.exp(-dt * 6));
       if (f.stroke || flick) f.phase = (f.phase + dt * TAU * frequency) % TAU;
       f.finPhase = (f.finPhase + dt * TAU * (2.1 + f.effort * 1.5)) % TAU;
-      swimAttribute.setXYZW(
-        f.id,
+      const flock = flocks[f.species];
+      flock.swim.setXYZW(
+        f.slot,
         f.phase,
         f.effort * GAIT.waveAngle,
         -f.bend,
         f.finBrake,
       );
-      finPhaseAttribute.setX(f.id, f.finPhase);
+      flock.finPhase.setX(f.slot, f.finPhase);
 
       axisZ.crossVectors(heading, UP).normalize();
       axisY.crossVectors(axisZ, heading).normalize();
@@ -1651,13 +1677,15 @@ export function createFishSchool(
       f.quaternion.copy(targetQuaternion);
       scale.setScalar(f.scale);
       instance.compose(position, f.quaternion, scale);
-      bodies.setMatrixAt(f.id, instance);
-      membranes.setMatrixAt(f.id, instance);
+      flock.bodies.setMatrixAt(f.slot, instance);
+      flock.membranes.setMatrixAt(f.slot, instance);
     }
-    bodies.instanceMatrix.needsUpdate = true;
-    membranes.instanceMatrix.needsUpdate = true;
-    swimAttribute.needsUpdate = true;
-    finPhaseAttribute.needsUpdate = true;
+    for (const flock of flocks) {
+      flock.bodies.instanceMatrix.needsUpdate = true;
+      flock.membranes.instanceMatrix.needsUpdate = true;
+      flock.swim.needsUpdate = true;
+      flock.finPhase.needsUpdate = true;
+    }
   }
 
   for (const f of fish) if (f.id % 4 !== 0) leave(f);
@@ -1665,6 +1693,10 @@ export function createFishSchool(
   return {
     update,
     fish,
+    // One entry per species, in SPECIES order: its meshes, its geometry and the two
+    // instanced attributes that drive them. A fish's own instance is flocks[species] at
+    // slot, not at its id.
+    flocks,
     getTelemetry() {
       const states = { hover: 0, travel: 0, settle: 0, inspect: 0, feed: 0, escape: 0 };
       let twitching = 0,
@@ -1694,12 +1726,14 @@ export function createFishSchool(
       };
     },
     dispose() {
-      scene.remove(bodies, membranes);
-      geometry.body.dispose();
-      geometry.fins.dispose();
-      skinMaterial.dispose();
-      finMaterial.dispose();
-      depthMaterial.dispose();
+      for (const flock of flocks) {
+        scene.remove(flock.bodies, flock.membranes);
+        flock.geometry.body.dispose();
+        flock.geometry.fins.dispose();
+        flock.skin.dispose();
+        flock.fins.dispose();
+        flock.depth.dispose();
+      }
     },
   };
 }

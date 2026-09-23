@@ -13,15 +13,25 @@
 import Cocoa
 import WebKit
 import IOKit.ps
+import ServiceManagement
 
 let sceneScheme = "desktop-habitats"
 let sceneHost = "local"
+
+/// A localized string as a JavaScript literal, for the page-side text below.
+func js(_ text: String) -> String {
+  let encoded = String(data: (try? JSONSerialization.data(withJSONObject: [text])) ?? Data(),
+    encoding: .utf8) ?? ""
+  return encoded.isEmpty ? "\"\"" : String(encoded.dropFirst().dropLast())
+}
 
 /// The scenes the app can show, each a directory under scenes/ with a wallpaper.html.
 enum Habitat: String, CaseIterable {
   case riverscape, reefscape
 
-  var title: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
+  /// The scene's name as the menu shows it. The raw value stays the stored identifier and
+  /// the directory name, so it is never localized.
+  var title: String { NSLocalizedString(rawValue.capitalized, comment: "the name of a scene") }
   var page: String { "/scenes/\(rawValue)/wallpaper.html" }
   /// What shows before the page has drawn anything, matched to each scene's own dark.
   var background: NSColor {
@@ -143,6 +153,37 @@ final class Wallpaper: NSObject, WKNavigationDelegate {
             const canvas = document.querySelector('#scene');
             if (canvas) canvas.dispatchEvent(new PointerEvent('pointerleave'));
           };
+          """,
+        injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    // The scene carries its own English for the two states a wallpaper can show before or
+    // instead of the aquarium. Both are swapped here so the app speaks one language.
+    let loadingText = NSLocalizedString("Loading aquarium…", comment: "shown until the first frame")
+    let failedText = NSLocalizedString(
+      "The aquarium could not start.", comment: "shown when the scene cannot run")
+    let reloadText = NSLocalizedString("Reload aquarium", comment: "the link offered on failure")
+    settings.userContentController.addUserScript(
+      WKUserScript(
+        source: """
+          (() => {
+            const swap = () => {
+              const loading = document.querySelector('#loading p');
+              if (loading && loading.textContent !== \(js(loadingText)))
+                loading.textContent = \(js(loadingText));
+              const box = document.querySelector('#error');
+              if (!box || box.hidden || box.dataset.habitatLocalized) return;
+              box.dataset.habitatLocalized = '1';
+              const link = box.querySelector('a');
+              box.replaceChildren(document.createTextNode(\(js(failedText))));
+              if (link) { link.textContent = \(js(reloadText)); box.append(link); }
+            };
+            const start = () => {
+              swap();
+              new MutationObserver(swap).observe(
+                document.documentElement, { childList: true, subtree: true });
+            };
+            document.readyState === 'loading'
+              ? addEventListener('DOMContentLoaded', start) : start();
+          })();
           """,
         injectionTime: .atDocumentStart, forMainFrameOnly: true))
 
@@ -329,6 +370,7 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     Controller.shared = self
     build()
     addMenu()
+    addToLoginItems()
 
     let center = NotificationCenter.default
     center.addObserver(
@@ -385,6 +427,36 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     snapshots = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .main)
     snapshots?.setEventHandler { [weak self] in self?.snapshot() }
     snapshots?.resume()
+  }
+
+  /// Adds the wallpaper to the login items when it is opened from an Applications folder, so
+  /// that signing in brings the aquarium back. A copy that is only being run from the disk
+  /// image, or from a build directory, is left out of it. The app adds itself once: turning
+  /// it off afterwards in System Settings is a choice that stays made.
+  private func addToLoginItems() {
+    let app = Bundle.main.bundlePath
+    let parent = (app as NSString).deletingLastPathComponent
+    guard parent == "/Applications" || parent == NSHomeDirectory() + "/Applications" else {
+      return
+    }
+    // `wallpaper/install.sh` starts the app from a login agent instead. Both would run at
+    // login and the desktop would get two copies of the aquarium.
+    let agent =
+      NSHomeDirectory() + "/Library/LaunchAgents/\(Bundle.main.bundleIdentifier ?? "").plist"
+    guard !FileManager.default.fileExists(atPath: agent) else { return }
+    guard UserDefaults.standard.string(forKey: "loginItemPath") != app else { return }
+    let service = SMAppService.mainApp
+    guard service.status != .enabled else {
+      UserDefaults.standard.set(app, forKey: "loginItemPath")
+      return
+    }
+    do {
+      try service.register()
+      UserDefaults.standard.set(app, forKey: "loginItemPath")
+      NSLog("desktop-habitats: added to the login items")
+    } catch {
+      NSLog("desktop-habitats: the login item was refused: \(error.localizedDescription)")
+    }
   }
 
   /// Draws for a moment even if the desktop is covered, then saves the frame.
@@ -528,7 +600,8 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     state.isEnabled = false
     menu.addItem(state)
     menu.addItem(.separator())
-    let environments = NSMenu(title: "Environment")
+    let environments = NSMenu(
+      title: NSLocalizedString("Environment", comment: "the scenes the wallpaper can show"))
     environments.autoenablesItems = false
     for choice in Habitat.allCases {
       let item = NSMenuItem(title: choice.title, action: #selector(selectHabitat), keyEquivalent: "")
@@ -537,11 +610,11 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
       environments.addItem(item)
       habitatItems.append(item)
     }
-    let environment = NSMenuItem(title: "Environment", action: nil, keyEquivalent: "")
+    let environment = NSMenuItem(title: environments.title, action: nil, keyEquivalent: "")
     environment.submenu = environments
     menu.addItem(environment)
     menu.addItem(.separator())
-    feed.title = "Feed"
+    feed.title = NSLocalizedString("Feed", comment: "drops food into every tank")
     feed.target = self
     feed.action = #selector(feedFish)
     menu.addItem(feed)
@@ -549,7 +622,9 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     pause.action = #selector(togglePause)
     menu.addItem(pause)
     menu.addItem(.separator())
-    let leave = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
+    let leave = NSMenuItem(
+      title: NSLocalizedString("Quit", comment: "stops the wallpaper until it is opened again"),
+      action: #selector(quit), keyEquivalent: "q")
     leave.target = self
     menu.addItem(leave)
     item.menu = menu
@@ -567,15 +642,22 @@ final class Controller: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     state.title =
       lowPower
-      ? "Still, for Low Power Mode"
+      ? NSLocalizedString("Still, for Low Power Mode", comment: "why the wallpaper is still")
       : stopped
-        ? reduceMotion ? "Paused, for Reduce Motion" : "Paused"
+        ? (reduceMotion
+          ? NSLocalizedString("Paused, for Reduce Motion", comment: "why the wallpaper is still")
+          : NSLocalizedString("Paused", comment: ""))
         : !awake
-          ? "Still, the screen is off"
+          ? NSLocalizedString("Still, the screen is off", comment: "why the wallpaper is still")
           : applied == 0
-            ? "Resting behind your windows"
-            : "Running at \(applied) frames a second"
-    pause.title = stopped ? "Resume" : "Pause"
+            ? NSLocalizedString("Resting behind your windows", comment: "nothing is showing")
+            : String(
+              format: NSLocalizedString("Running at %d frames a second", comment: "the frame rate"),
+              applied)
+    pause.title =
+      stopped
+      ? NSLocalizedString("Resume", comment: "starts the water again")
+      : NSLocalizedString("Pause", comment: "stops the water")
     // In Low Power Mode nothing is going to draw, so the item would be a false promise.
     // Reduce Motion is not the same case: the machine can perfectly well draw, it has
     // merely been asked not to, and Resume is how somebody says they want this one anyway.

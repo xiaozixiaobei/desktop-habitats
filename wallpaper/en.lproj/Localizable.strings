@@ -1,0 +1,23 @@
+/* The names of the two scenes, as the Environment menu shows them. */
+"Riverscape" = "Riverscape";
+"Reefscape" = "Reefscape";
+
+/* The menu bar. */
+"Environment" = "Environment";
+"Feed" = "Feed";
+"Pause" = "Pause";
+"Resume" = "Resume";
+"Quit" = "Quit";
+
+/* What the wallpaper says it is doing when the menu is opened. */
+"Running at %d frames a second" = "Running at %d frames a second";
+"Resting behind your windows" = "Resting behind your windows";
+"Still, the screen is off" = "Still, the screen is off";
+"Paused" = "Paused";
+"Paused, for Reduce Motion" = "Paused, for Reduce Motion";
+"Still, for Low Power Mode" = "Still, for Low Power Mode";
+
+/* The two states the scene itself can show. */
+"Loading aquarium…" = "Loading aquarium…";
+"The aquarium could not start." = "The aquarium could not start.";
+"Reload aquarium" = "Reload aquarium";

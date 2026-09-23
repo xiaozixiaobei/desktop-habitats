@@ -42,9 +42,9 @@ let travelling = 0,
   gliding = 0,
   beatingInPlace = 0,
   peakBeatFrequency = 0;
-const swimAttribute = scene
-  .getObjectByName("Silver-blue freshwater fish")
-  .geometry.getAttribute("aSwim");
+const swimAttributes = school.flocks.map((flock) =>
+  flock.geometry.body.getAttribute("aSwim"),
+);
 const tracks = school.fish.map((fish) => ({
   minimum: fish.position.clone(),
   maximum: fish.position.clone(),
@@ -59,7 +59,7 @@ for (let frame = 0; frame < 7200; frame++) {
     const track = tracks[fish.id];
     track.minimum.min(fish.position);
     track.maximum.max(fish.position);
-    const tailAngle = swimAttribute.getY(fish.id);
+    const tailAngle = swimAttributes[fish.species].getY(fish.slot);
     const phaseStep = (fish.phase - track.phase + Math.PI * 2) % (Math.PI * 2);
     peakBeatFrequency = Math.max(peakBeatFrequency, phaseStep / (Math.PI * 2 * STEP));
     track.phase = fish.phase;

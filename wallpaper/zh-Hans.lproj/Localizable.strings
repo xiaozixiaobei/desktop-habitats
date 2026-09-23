@@ -1,0 +1,23 @@
+/* 两种场景的名字，出现在「场景」菜单里。 */
+"Riverscape" = "河景缸";
+"Reefscape" = "礁岩缸";
+
+/* 菜单栏。 */
+"Environment" = "场景";
+"Feed" = "喂食";
+"Pause" = "暂停";
+"Resume" = "继续";
+"Quit" = "退出";
+
+/* 打开菜单时，壁纸当前的状态。 */
+"Running at %d frames a second" = "运行中 · %d 帧/秒";
+"Resting behind your windows" = "静息于窗口之后";
+"Still, the screen is off" = "已静止 · 屏幕已关闭";
+"Paused" = "已暂停";
+"Paused, for Reduce Motion" = "已暂停 · 减弱动态效果";
+"Still, for Low Power Mode" = "已静止 · 低电量模式";
+
+/* 场景自身会显示的两种状态。 */
+"Loading aquarium…" = "正在加载水族箱…";
+"The aquarium could not start." = "水族箱无法启动。";
+"Reload aquarium" = "重新加载水族箱";

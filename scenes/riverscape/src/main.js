@@ -24,7 +24,20 @@ let paused =
   matchMedia("(prefers-reduced-motion: reduce)").matches;
 const query = new URLSearchParams(location.search);
 const wallpaper = document.documentElement.dataset.motion === "host";
-let profile = query.get("quality") === "reference" ? "reference" : preferredQuality(query);
+// The wallpaper is the product rather than a preview, so it renders at the detail preset:
+// the skin shader fades its scale and fin-ray detail out once a cell is smaller than a
+// pixel, and the wallpaper is the one place the fish are on screen closely enough for
+// that to matter. A browser preview stays on the balanced preset to keep the page light,
+// and an explicit ?quality= still wins over both.
+const asked = query.get("quality");
+let profile =
+  asked === "reference"
+    ? "reference"
+    : asked
+      ? qualityName(asked)
+      : wallpaper
+        ? "detail"
+        : preferredQuality(query);
 if (query.get("still") === "1") paused = true;
 let onBattery = false;
 let settings = renderSettings({ profile, wallpaper, pixelRatio: devicePixelRatio });
