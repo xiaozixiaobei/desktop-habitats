@@ -3,14 +3,14 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
 const source = readFileSync(new URL('../gallery.js', import.meta.url), 'utf8');
-function setup(reduceMotion = false) {
+function setup(reduceMotion = false, names = ['River', 'Reef']) {
   const frames = new Map();
   const timers = new Map();
   let nextId = 0;
   let now = 0;
   const handlers = {};
   const classes = new Set();
-  const portals = ['River', 'Reef'].map(name => ({
+  const portals = names.map(name => ({
     offsetWidth: 1000,
     style: { setProperty() {} },
     classList: { toggle() {} },
@@ -204,3 +204,13 @@ const wheelEvent = (deltaX, deltaY) => ({ deltaX, deltaY, deltaMode: 0, preventD
   assert.equal(app.read('position'), 1, 'releasing at the destination does not push beyond it');
 }
 console.log('PASS: gallery axis lock, intent, velocity continuity, gentle completion, interruption, reduced motion and cancellation');
+
+{
+  const app = setup(true, ['River', 'Reef', 'Stream']);
+  const transforms = app.portals.map(portal => portal.style.transform);
+  assert.equal(new Set(transforms).size, 3, 'three previews occupy distinct carousel positions');
+  app.read('select(2)');
+  assert.equal(app.read('wrap(nearest(position))'), 2, 'clicking third preview selects it directly');
+  app.handlers.keydown({ key: 'ArrowRight', preventDefault() {} });
+  assert.equal(app.read('wrap(nearest(position))'), 0, 'navigation wraps all three scenes');
+}

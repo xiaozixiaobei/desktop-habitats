@@ -1,4 +1,4 @@
-/* The names of the two scenes, as the Environment menu shows them. */
+/* The names of the scenes, as the Environment menu shows them. */
 "Riverscape" = "Riverscape";
 "Reefscape" = "Reefscape";
 
@@ -21,3 +21,5 @@
 "Loading aquarium…" = "Loading aquarium…";
 "The aquarium could not start." = "The aquarium could not start.";
 "Reload aquarium" = "Reload aquarium";
+
+"Streamscape" = "Streamscape";

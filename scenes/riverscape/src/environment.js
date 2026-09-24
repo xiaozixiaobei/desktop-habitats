@@ -958,3 +958,6 @@ export function createParticles(scene, { thickets }) {
     },
   };
 }
+
+// Reused by the rocky Streamscape habitat; Riverscape construction is unchanged.
+export { rockGeometry, mossLayer, plantFronds };

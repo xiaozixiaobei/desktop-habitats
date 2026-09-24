@@ -27,9 +27,9 @@ let clickDuringMotion = false;
 
 function render() {
   for (const [index, portal] of portals.entries()) {
-    const angle = (index - position) * Math.PI;
+    const angle = (index - position) * Math.PI * 2 / portals.length;
     const depth = (1 - Math.cos(angle)) / 2;
-    // Opposite arcs keep the two opaque images apart as they exchange depth.
+    // Space every preview around the same orbit as scenes are added.
     const x = 48 * depth + 50 * Math.sin(angle);
     portal.style.transform = `translate3d(${x}%, ${-4 * depth}%, ${-520 * depth}px) rotateY(${-18 * depth}deg)`;
     portal.style.zIndex = Math.round(1000 * (1 - depth));
@@ -132,7 +132,9 @@ function snap(target) {
 }
 function select(index) {
   const front = nearest(position);
-  snap(wrap(front) === index ? front : front + 1);
+  const forward = wrap(index - wrap(front));
+  const offset = forward > portals.length / 2 ? forward - portals.length : forward;
+  snap(front + offset);
 }
 
 document.addEventListener('keydown', event => {

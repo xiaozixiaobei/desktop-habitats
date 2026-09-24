@@ -1,4 +1,4 @@
-/* 两种场景的名字，出现在「场景」菜单里。 */
+/* 场景的名字，出现在「场景」菜单里。 */
 "Riverscape" = "河景缸";
 "Reefscape" = "礁岩缸";
 
@@ -21,3 +21,5 @@
 "Loading aquarium…" = "正在加载水族箱…";
 "The aquarium could not start." = "水族箱无法启动。";
 "Reload aquarium" = "重新加载水族箱";
+
+"Streamscape" = "溪流缸";
